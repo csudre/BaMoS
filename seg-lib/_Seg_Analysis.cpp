@@ -13330,6 +13330,10 @@ void LesionCodeImprovedT1T2(Lesion * LesionToCode){
                     cout<<"Suspicious cortical sheet lesion ";
                     LesionToCode->LesionType=SCS2;
                 }
+                if (LesionToCode->Volume>10000 && LesionToCode->DistanceVentricle==0 && LesionToCode->ProportionWM>0.3){
+                    cout << "Probably massive lesion with issues at border";
+                    LesionToCode->LesionType=PV;
+                }
                 else if(LesionToCode->ProportionCSF>LesionToCode->ProportionWM){
                     cout<<"Cortical sheet near out mask ";
                     LesionToCode->LesionType=CS;
@@ -18490,7 +18494,7 @@ OutlierType ClassifyOutlierWMH(Outlier * OutlierToClassify, SEG_ANALYSIS * segme
         cout << "Out 3"<<endl;
         return OutlierTypeResult=OutWMH;
     }
-    if ((OutlierToClassify->DistanceVentricle[0]>3.5 && OutlierToClassify->ProportionNeighbour[IndexOut]*OutlierToClassify->Volume>2 && OutlierToClassify->Volume<1000) || (OutlierToClassify->ProportionNeighbour[IndexOut] > 0.05 && OutlierToClassify->DistanceOutI[0]<3)) {
+    if ((OutlierToClassify->DistanceVentricle[0]>3.5 && OutlierToClassify->ProportionNeighbour[IndexOut]*OutlierToClassify->Volume>2 && OutlierToClassify->Volume<1000) || (OutlierToClassify->ProportionNeighbour[IndexOut] > 0.05 && OutlierToClassify->DistanceOutI[0]<3 && (OutlierToClassify->Volume<10000))) {
         cout << "Out 4"<<endl;
         return OutlierTypeResult=OutWMH;
     }
