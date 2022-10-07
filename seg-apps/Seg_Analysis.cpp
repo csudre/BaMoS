@@ -868,6 +868,10 @@ int main(int argc, char **argv)
             segment_analysis->flag_inMahal=1;
             segment_analysis->filename_inMahal=argv[++i];
         }
+        else if (strcmp(argv[i], "-inHemi") == 0 && (i+1)<argc){
+            segment_analysis->filename_Hemi=argv[++i];
+            segment_analysis->flag_Hemi=1;
+        }
         else if(strcmp(argv[i], "-inCST") == 0 && (i+1)<argc){
             segment_analysis->flag_CST=1;
             segment_analysis->filename_inCST=argv[++i];
@@ -2111,7 +2115,7 @@ int main(int argc, char **argv)
     
     //    Case where we simply build the lesion zones based on distance to lobes
     if(segment_analysis->flag_inLobes && segment_analysis->flag_inLesCorr && segment_analysis->flag_mask){
-        
+        cout << "Lobar creation";
         FilenamePA=nifti_makebasename(segment_analysis->filename_inLesCorr);
         
         
@@ -2127,6 +2131,7 @@ int main(int argc, char **argv)
         string FilenameSavePb2=FilenamePA_b+"DistanceChoicePb2_"+FilenamePA_e+".nii.gz";
         //        vector<nifti_image*> VectorNiiLobes;
         vector<nifti_image*> VectorNiiDistances;
+        cout << "Loading lesion file";
         nifti_image * LesionNii=ReadFromFilename(segment_analysis->filename_inLesCorr);
         int numel=LesionNii->nvox;
         int Dim[3];
@@ -2145,25 +2150,42 @@ int main(int argc, char **argv)
         Shift[0]=1;
         Shift[1]=Dim[0];
         Shift[2]=Shift[1]*Dim[1];
+        cout << "Loading mask";
         nifti_image * MaskNii=ReadFromFilename(segment_analysis->filename_mask);
         bool * MaskData=static_cast<bool*>(MaskNii->data);
         int * L2S=MakeL2S(MaskData,Dim);
         int numelmasked=0;
         int * S2L=MakeS2L(MaskData,Dim,numelmasked);
+        cout << "Mapping S2L L2S created numel is "<< numel<<" "<<MaskNii->nvox <<endl;
         nifti_image * Test1=CreateNiiFromArray(MaskData, LesionNii, numel);
+        cout << "Image created" << endl;
+        cout << FilenamePA_b <<" " << FilenamePA_e << endl;
         string FilenameSaveMask=FilenamePA_b+"MaskTest_"+FilenamePA_e+".nii.gz";
+        cout << "Name to save image mask" << FilenameSaveMask << endl;
         nifti_set_filenames(Test1, FilenameSaveMask.c_str(), 0, 0);
-        nifti_image_write(Test1);
+        cout << "Filename set" << endl;
+        // nifti_image_write(Test1);
+        cout << "Image written" <<endl;
         nifti_image_free(Test1);
+        cout << "Memory freed" << endl;
         Test1=NULL;
         int numbLobes=segment_analysis->filename_inLobes.size();
-
+        cout << "Number of lobes is "<<numbLobes;
         vector<float *> Hemisphere;
         nifti_image * ParcNii = NULL;
         float * ParcData = NULL;
+        float * HemisphereLeft = new float[numel];
+        float * HemisphereRight  = new float[numel];
+        nifti_image * HemiNii = NULL;
+        float * HemiData = NULL;
         if (segment_analysis->filename_Parc!=NULL){
                 ParcNii = ReadFromFilename(segment_analysis->filename_Parc);
                 ParcData = static_cast<float*>(ParcNii->data);
+        }
+        else if(segment_analysis->filename_Hemi!=NULL){
+            cout << "Preparation using existing hemispheres";
+            HemiNii = ReadFromFilename(segment_analysis->filename_Hemi);
+            HemiData = static_cast<float*>(HemiNii->data);
         }
         else {
             ParcData = new float[numel];
@@ -2171,12 +2193,33 @@ int main(int argc, char **argv)
                 ParcData[i] = 0;
             }
         }
-        float * HemisphereLeft = CreateHemisphereFromParc(ParcData, 0, numel);
-        MultiplyFloatArrayBy(HemisphereLeft, 1000, numel);
-        float * HemisphereRight = CreateHemisphereFromParc(ParcData, 1, numel);
-        cout << "Sum Hemisphere Right "<< GetSum(HemisphereRight, numel) << endl;
-        MultiplyFloatArrayBy(HemisphereRight,1000, numel);
-        cout << "New sum HR" << GetSum(HemisphereRight, numel) << endl;
+        if (ParcData==NULL){
+            for(int i=0;i<numel;i++){
+                if (HemiData[i] == 1){
+                    HemisphereLeft[i] = 1;
+                    HemisphereRight[i] =0;
+                }
+                else if (HemiData[i]==2){
+                    HemisphereRight[i] = 1;
+                    HemisphereLeft[i] = 0;
+                }
+                else{
+                    HemisphereRight[i] = 0;
+                    HemisphereRight[i] =0;
+                }
+            }
+            MultiplyFloatArrayBy(HemisphereLeft,1000,numel);
+            MultiplyFloatArrayBy(HemisphereRight,1000,numel);
+        }
+        else{
+            float * HemisphereLeft = CreateHemisphereFromParc(ParcData, 0, numel);
+            MultiplyFloatArrayBy(HemisphereLeft, 1000, numel);
+            float * HemisphereRight = CreateHemisphereFromParc(ParcData, 1, numel);
+            cout << "Sum Hemisphere Right "<< GetSum(HemisphereRight, numel) << endl;
+            MultiplyFloatArrayBy(HemisphereRight,1000, numel);
+
+        }
+                cout << "New sum HR" << GetSum(HemisphereRight, numel) << endl;
         Hemisphere.push_back(HemisphereLeft);
         Hemisphere.push_back(HemisphereRight);
         for(int i=0;i<numbLobes-2;i++){

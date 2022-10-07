@@ -124,6 +124,7 @@ struct SEG_ANALYSIS{
     bool flag_AvDist;
     bool flag_Parc;
     int flag_VentrSeg;
+    bool flag_Hemi;
     bool flag_Analysis;
     bool flag_AnalysisConnect;
     bool flag_GivenModa;
@@ -263,6 +264,7 @@ struct SEG_ANALYSIS{
     char* filename_compJoint;
     vector<char*> filename_compMult;
     char * filename_inAuthorised;
+    char * filename_Hemi;
     char * filename_dot1;
     char * filename_dot2;
     char * filename_Out;
@@ -1926,6 +1928,7 @@ template <typename T> nifti_image * CreateNiiFromArray(T * ArrayForNii, nifti_im
     for (int i=0; i<numel; i++) {
         BuiltData[i]=(float)ArrayForNii[i];
     }
+    cout << "Built"<<endl;
     return BuiltNii;
 }
 
