@@ -68,7 +68,7 @@ def correct_lesion(lesion_tocorr, correction, type_corr):
     if type_corr == 'add' or type_corr=='de novo':
         #lesion_corr = lesion_tocorr + correction
         lesion_corr = np.where(lesion_tocorr > 0.4, lesion_tocorr, correction)
-	return lesion_corr
+    return lesion_corr
     if type_corr == 'remove':
         lesion_corr = lesion_tocorr - correction
         return lesion_corr
@@ -92,7 +92,7 @@ def process_full_case(lesion_tocorr, lesion_init, connect, df_point
             correction = associated_seg(lesion_init, connect, label)
 
             lesion_corr = correct_lesion(lesion_corr, correction, type_corr)
-	    print(np.sum(lesion_corr))
+        print(np.sum(lesion_corr))
     return lesion_corr
 
 def associated_mahalseg(mahal, connect, value, thresh=3.0):
@@ -134,7 +134,7 @@ def process_full_mahal(lesion_tocorr, mahal, connect, parcellation, df_point,
 
     artefact_zone += artefact_extend
     for i in range(df_point.shape[0]):
-	print(df_point.iloc[i])
+        print(df_point.iloc[i])
         range_x = -1
         range_y = -1
         range_z = -1
@@ -181,9 +181,9 @@ def process_full_mahal(lesion_tocorr, mahal, connect, parcellation, df_point,
             lesion_corr = np.where(lesion_corr > 0.4, lesion_corr,correction)
 	    
         else:
-	    print('impossible to find anything to correct')
-	print(np.sum(lesion_corr))
-	print(np.sum(lesion_corr)-np.sum(lesion_tocorr))
+            print('impossible to find anything to correct')
+    print(np.sum(lesion_corr))
+    print(np.sum(lesion_corr)-np.sum(lesion_tocorr))
     lesion_corr = np.where(lesion_corr < 0, np.zeros_like(lesion_corr), lesion_corr)
     
     return lesion_corr
@@ -233,20 +233,20 @@ def main(argv):
               '<file to correct> '
               '-save_name <name for saving>   ')
     df_corr = pd.read_csv(args.csv)
-    lesion_tocorr = nib.load(args.tocorr).get_data()
+    lesion_tocorr = nib.load(args.tocorr).get_fdata()
     if args.connect is not None:
-        init = nib.load(args.init).get_data()
-        connect = nib.load(args.connect).get_data()
+        init = nib.load(args.init).get_fdata()
+        connect = nib.load(args.connect).get_fdata()
         lesion_corr = process_full_case(lesion_tocorr,init,connect,df_corr)
     else:
-        mahal = nib.load(args.mahal).get_data()
-        parcellation = nib.load(args.parc).get_data()
-        connect = nib.load(args.init_connect).get_data()
+        mahal = nib.load(args.mahal).get_fdata()
+        parcellation = nib.load(args.parc).get_fdata()
+        connect = nib.load(args.init_connect).get_fdata()
         lesion_corr = process_full_mahal(lesion_tocorr, mahal, connect,
                                          parcellation,
                                          df_corr, args.thresh)
     nii_base = nib.load(args.tocorr)
-    new_name = args.tocorr.lstrip('.nii.gz') +'_'+args.save_name +'.nii.gz'
+    new_name = args.tocorr.split('.nii.gz')[0] +'_'+args.save_name +'.nii.gz'
     new_nii = nib.Nifti1Image(lesion_corr, nii_base.affine)
     nib.save(new_nii, new_name)
 
