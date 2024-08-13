@@ -5,8 +5,8 @@ import os
 import argparse
 import numpy as np
 import sys
-from scipy.ndimage.morphology import binary_dilation
-from scipy.ndimage.morphology import binary_erosion
+from scipy.ndimage import binary_dilation
+from scipy.ndimage import binary_erosion
 from scipy.ndimage import label
 
 
@@ -84,6 +84,8 @@ def ventr_corr(lesion, parcellation, dil=1):
 def cortical_corr(file, lesion, connected):
     df_parse = pd.DataFrame.from_dict(parse(file, 2))
     to_remove = np.zeros_like(lesion)
+    if df_parse.shape[0] == 0:
+        return to_remove
     df_toremove = df_parse[df_parse['ot']=='16']
     for lab in df_toremove['label']:
         label = int(lab)
@@ -95,6 +97,8 @@ def cortical_corr(file, lesion, connected):
 def hypot1_corr(file, lesion, connected):
     df_parse = pd.DataFrame.from_dict(parse(file,2))
     to_remove = np.zeros_like(lesion)
+    if df_parse.shape[0] == 0:
+        return to_remove
     df_toremove = df_parse[df_parse['mahalmean1'].astype(float)<-5.5]
     for lab in df_toremove['label']:
         label = int(lab)
@@ -215,7 +219,7 @@ def main(argv):
 
 
     lesion_nii = nib.load(args.lesion)
-    lesion_data  = lesion_nii.get_data()
+    lesion_data  = lesion_nii.get_fdata()
     print('Lesion range before corr ',np.min(lesion_data), np.max(lesion_data))
     path_results = os.path.split(args.lesion)[0]
     if args.connect != '':
@@ -228,8 +232,8 @@ def main(argv):
     if args.corr == 'choroid' or args.corr == 'all' or args.corr \
             =='choroid-sheet' or args.corr == 'choroid-cortex':
         parc_nii = nib.load(args.parc)
-        ventricles = create_ventricles(parc_nii.get_data())
-        border_thal = create_border_thalamusventr(parc_nii.get_data())
+        ventricles = create_ventricles(parc_nii.get_fdata())
+        border_thal = create_border_thalamusventr(parc_nii.get_fdata())
         choroid, aggreg_3d = slicewise_choroid(lesion_data, ventricles,
                                                border_thal)
         nii_choroid = nib.Nifti1Image(choroid, lesion_nii.affine)
@@ -242,7 +246,7 @@ def main(argv):
     if 'all' in args.corr or 'cortex' in args.corr or 'choroid-cortex' in \
             args.corr or 'cortical-sheet' in args.corr:
         cortical = cortical_corr(args.label, lesion_data,
-                       connect_nii.get_data())
+                       connect_nii.get_fdata())
         nii_cortical = nib.Nifti1Image(cortical, lesion_nii.affine)
         nib.save(nii_cortical, os.path.join(path_results,
                                            'CorticalCorr_' + args.id +
@@ -251,20 +255,20 @@ def main(argv):
     if 'all' in args.corr or 'sheet' in args.corr or 'choroid-sheet' in \
                 args.corr or 'cortical-sheet' in args.corr:
         parc_nii = nib.load(args.parc)
-        parc_data = parc_nii.get_data()
+        parc_data = parc_nii.get_fdata()
         sheet = cortical_sheet(lesion_data, parc_data)
         nii_cortical = nib.Nifti1Image(cortical, lesion_nii.affine)
         nib.save(nii_cortical, os.path.join(path_results,
                                             'SheetCorr_' + args.id +
                                             '.nii.gz'))
     if 'hypot1' in args.corr:
-        hypo_corr = hypot1_corr(args.label, lesion_data, connect_nii.get_data())
+        hypo_corr = hypot1_corr(args.label, lesion_data, connect_nii.get_fdata())
         nii_hypot1 = nib.Nifti1Image(hypo_corr, lesion_nii.affine)
         nib.save(nii_hypot1, os.path.join(path_results,
                                         'HypoCorr' + args.id +
                                         '.nii.gz'))
     if 'ventr' in args.corr:
-        parc_data = nib.load(args.parc).get_data()
+        parc_data = nib.load(args.parc).get_fdata()
         ventr_correction = ventr_corr(lesion_data, parc_data,
                                       dil=args.dil_ventr)
         nii_ventr = nib.Nifti1Image(ventr_correction, lesion_nii.affine)
