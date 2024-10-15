@@ -68,7 +68,7 @@ def correct_lesion(lesion_tocorr, correction, type_corr):
     if type_corr == 'add' or type_corr=='de novo':
         #lesion_corr = lesion_tocorr + correction
         lesion_corr = np.where(lesion_tocorr > 0.4, lesion_tocorr, correction)
-    return lesion_corr
+        return lesion_corr
     if type_corr == 'remove':
         lesion_corr = lesion_tocorr - correction
         return lesion_corr
@@ -85,12 +85,28 @@ def process_full_case(lesion_tocorr, lesion_init, connect, df_point
     for i in range(df_point.shape[0]):
         case = df_point.iloc[i]
         point = [case['x'], case['y'], case['z']]
+        range_x = -1
+        range_y = -1
+        range_z = -1
+        if 'range_x' in df_point.columns:
+            range_x = case['range_x']
+        if 'range_y' in df_point.columns:
+            range_y = case['range_y']
+        if 'range_z' in df_point.columns:
+            range_z = case['range_z']
+        allowed_zone = create_allowed_zone(point, shape=lesion_init.shape,
+                                           range_x=range_x, range_y=range_y,
+                                           range_z=range_z)
+        
         type_corr = case['type']
         label = find_associated_label(point, connect)
         print('Associated label is %d' % int(label))
         if label > 0:
             correction = associated_seg(lesion_init, connect, label)
-
+            print(np.sum(correction),'orig corr')
+            if np.sum(allowed_zone) > 0:
+                correction *= allowed_zone
+            print(np.sum(allowed_zone), np.sum(correction),' post allowance')
             lesion_corr = correct_lesion(lesion_corr, correction, type_corr)
         print(np.sum(lesion_corr))
     return lesion_corr
@@ -155,7 +171,9 @@ def process_full_mahal(lesion_tocorr, mahal, connect, parcellation, df_point,
         if label > 0:
             correction = associated_mahalseg(mahal, connect, label,
                                              thresh)
+            print(np.sum(correction), np.sum(allowed_zone))
             correction *= allowed_zone
+            print(np.sum(correction), 'after allowance zone')
             if case['artefact']:
                 correction = np.where(artefact_zone>=1, np.zeros_like(
                     correction), correction)
@@ -247,6 +265,7 @@ def main(argv):
                                          df_corr, args.thresh)
     nii_base = nib.load(args.tocorr)
     new_name = args.tocorr.split('.nii.gz')[0] +'_'+args.save_name +'.nii.gz'
+    print(new_name)
     new_nii = nib.Nifti1Image(lesion_corr, nii_base.affine)
     nib.save(new_nii, new_name)
 
