@@ -79,12 +79,32 @@ def correct_lesion(lesion_tocorr, correction, type_corr):
     print('Unknown correction type ', type_corr)
     return lesion_tocorr
 
-def process_full_case(lesion_tocorr, lesion_init, connect, df_point
+def process_full_case(lesion_tocorr, lesion_init, connect, df_point, mahal, parcellation, thresh
                       ):
     lesion_corr = lesion_tocorr
+    artefact_zone = np.zeros_like(parcellation)
+    if 'artefact' not in df_point.columns:
+        df_point['artefact'] = False
+        artefact_zone = np.zeros_like(parcellation)
+    if df_point['artefact']:
+        artefact_zone = np.where(parcellation>98, np.ones_like(
+        parcellation), np.zeros_like(parcellation))
+        artefact_extend = np.zeros_like(parcellation)
+
+        for f in LIST_ARTEFACTS:
+            artefact_zone = np.where(parcellation==f, np.ones_like(parcellation),
+                                 artefact_zone)
+        for f in LIST_EXTEND:
+            artefact_extend = np.where(parcellation==f, np.ones_like(
+                parcellation), artefact_extend)
+        artefact_extend = binary_dilation(artefact_extend,iterations=3)
+
+        artefact_zone += artefact_extend
     for i in range(df_point.shape[0]):
         case = df_point.iloc[i]
+        
         point = [case['x'], case['y'], case['z']]
+        print(point)
         range_x = -1
         range_y = -1
         range_z = -1
@@ -103,11 +123,36 @@ def process_full_case(lesion_tocorr, lesion_init, connect, df_point
         print('Associated label is %d' % int(label))
         if label > 0:
             correction = associated_seg(lesion_init, connect, label)
+            
+            if np.sum(correction) == 0:
+                print('nothing in original seg but in connect')
+                correction = associated_mahalseg(mahal,connect,label)
+                
             print(np.sum(correction),'orig corr')
+            correction = np.where(artefact_zone>=1, np.zeros_like(
+                    correction), correction)
+            print(np.sum(correction), 'post artefact')
             if np.sum(allowed_zone) > 0:
                 correction *= allowed_zone
             print(np.sum(allowed_zone), np.sum(correction),' post allowance')
             lesion_corr = correct_lesion(lesion_corr, correction, type_corr)
+        elif label==-1 and type_corr=='de novo' and mahal is not None:
+            print('Creating de novo')
+            correction = associated_mahalnovo(mahal, point, thresh)
+            correction *= allowed_zone
+            if parcellation is not None:
+                artefact_zone = create_artefact_zone(parcellation)
+            else:
+                artefact_zone = np.zeros_like(correction)
+            if case['artefact']:
+                correction = np.where(artefact_zone >= 1, np.zeros_like(
+                    correction), correction)
+                cc_corr, numb_cc = cc(correction)
+                if numb_cc > 1:
+                    cc_value = find_associated_label(point, cc_corr)
+                    correction = np.where(cc_corr == cc_value, correction,
+                                          np.zeros_like(parcellation))
+            lesion_corr = np.where(lesion_corr > 0.4, lesion_corr,correction)
         print(np.sum(lesion_corr))
     return lesion_corr
 
@@ -131,6 +176,22 @@ def associated_mahalnovo(mahal, point, thresh):
     lesion_new = np.where(lesion_new >= 0.5, lesion_new, np.zeros_like(
         lesion_new))
     return lesion_new
+
+def create_artefact_zone(parcellation):
+    artefact_zone = np.where(parcellation>98, np.ones_like(
+        parcellation), np.zeros_like(parcellation))
+    artefact_extend = np.zeros_like(parcellation)
+
+    for f in LIST_ARTEFACTS:
+        artefact_zone = np.where(parcellation==f, np.ones_like(parcellation),
+                                 artefact_zone)
+    for f in LIST_EXTEND:
+        artefact_extend = np.where(parcellation==f, np.ones_like(
+            parcellation), artefact_extend)
+    artefact_extend = binary_dilation(artefact_extend,iterations=3)
+
+    artefact_zone += artefact_extend
+    return artefact_zone
 
 def process_full_mahal(lesion_tocorr, mahal, connect, parcellation, df_point,
                        region=10,
@@ -252,10 +313,17 @@ def main(argv):
               '-save_name <name for saving>   ')
     df_corr = pd.read_csv(args.csv)
     lesion_tocorr = nib.load(args.tocorr).get_fdata()
-    if args.connect is not None:
+    if args.init_connect is not None:
         init = nib.load(args.init).get_fdata()
-        connect = nib.load(args.connect).get_fdata()
-        lesion_corr = process_full_case(lesion_tocorr,init,connect,df_corr)
+        connect = nib.load(args.init_connect).get_fdata()
+        if args.mahal is not None:
+            mahal = nib.load(args.mahal).get_fdata()
+            parcellation = nib.load(args.parc).get_fdata()
+        else:
+            mahal = None
+            parcellation = None
+
+        lesion_corr = process_full_case(lesion_tocorr,init,connect,df_corr,mahal,parcellation,args.thresh)
     else:
         mahal = nib.load(args.mahal).get_fdata()
         parcellation = nib.load(args.parc).get_fdata()
